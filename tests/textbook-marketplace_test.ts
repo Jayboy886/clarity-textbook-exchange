@@ -50,7 +50,7 @@ Clarinet.test({
 });
 
 Clarinet.test({
-    name: "Can return a rented textbook",
+    name: "Can return a rented textbook before expiration",
     async fn(chain: Chain, accounts: Map<string, Account>) {
         const wallet1 = accounts.get('wallet_1')!;
         const wallet2 = accounts.get('wallet_2')!;
@@ -72,6 +72,38 @@ Clarinet.test({
         ]);
         
         block.receipts[2].result.expectOk().expectBool(true);
+    }
+});
+
+Clarinet.test({
+    name: "Cannot return textbook after rental period expires",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        const wallet1 = accounts.get('wallet_1')!;
+        const wallet2 = accounts.get('wallet_2')!;
+        
+        let block = chain.mineBlock([
+            Tx.contractCall('textbook-marketplace', 'list-textbook', [
+                types.ascii("Computer Science 101"),
+                types.ascii("1234567890123"),
+                types.uint(100),
+                types.uint(20),
+                types.uint(5)
+            ], wallet1.address),
+            Tx.contractCall('textbook-marketplace', 'rent-textbook', [
+                types.uint(0)
+            ], wallet2.address)
+        ]);
+
+        // Mine 6 blocks to exceed rental duration
+        chain.mineEmptyBlock(6);
+
+        let returnBlock = chain.mineBlock([
+            Tx.contractCall('textbook-marketplace', 'return-textbook', [
+                types.uint(0)
+            ], wallet2.address)
+        ]);
+        
+        returnBlock.receipts[0].result.expectErr().expectUint(106);
     }
 });
 
