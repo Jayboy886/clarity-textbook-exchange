@@ -5,6 +5,7 @@
 (define-constant err-wrong-price (err u103))
 (define-constant err-not-available (err u104))
 (define-constant err-invalid-rating (err u105))
+(define-constant err-rental-expired (err u106))
 
 ;; Define data variables
 (define-data-var next-listing-id uint u0)
@@ -22,6 +23,7 @@
         is-available: bool,
         is-rental: bool,
         rental-duration: uint,
+        rental-start: (optional uint),
         renter: (optional principal)
     }
 )
@@ -51,6 +53,7 @@
                 is-available: true,
                 is-rental: false,
                 rental-duration: rental-duration,
+                rental-start: none,
                 renter: none
             }
         )
@@ -92,6 +95,7 @@
             (merge listing { 
                 is-available: false,
                 is-rental: true,
+                rental-start: (some block-height),
                 renter: (some tx-sender)
             })
         )
@@ -104,13 +108,17 @@
     (let (
         (listing (unwrap! (map-get? textbooks { listing-id: listing-id }) (err err-not-listed)))
         (renter (get renter listing))
+        (rental-start (get rental-start listing))
+        (rental-duration (get rental-duration listing))
     )
         (asserts! (is-eq (some tx-sender) renter) (err err-not-owner))
+        (asserts! (< (- block-height (unwrap! rental-start (err err-not-listed))) rental-duration) (err err-rental-expired))
         (map-set textbooks
             { listing-id: listing-id }
             (merge listing {
                 is-available: true,
                 is-rental: false,
+                rental-start: none,
                 renter: none
             })
         )
